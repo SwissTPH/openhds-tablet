@@ -2,9 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.openhds.mobile"
     android:versionCode="1"
-    android:versionName="1.6" >
+    android:versionName="1.6.1" >
 
-    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="22" />
+    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="25" />
     
     <permission
             android:name="com.mine.signedgooglemap.permission.MAPS_RECEIVE"
