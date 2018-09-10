@@ -1,42 +1,32 @@
 package org.openhds.mobile.task;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PushbackInputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import org.openhds.mobile.provider.OpenHDSProvider;
-import android.os.Environment;
-import net.sqlcipher.database.SQLiteDatabase;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.auth.BasicScheme;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
 import org.openhds.mobile.OpenHDS;
 import org.openhds.mobile.R;
 import org.openhds.mobile.listener.SyncDatabaseListener;
 import org.openhds.mobile.model.Settings;
+import org.openhds.mobile.provider.OpenHDSProvider;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -46,7 +36,10 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.os.Environment;
+import android.util.Base64;
 import android.util.Log;
+import net.sqlcipher.database.SQLiteDatabase;
 
 /**
  * AsyncTask responsible for downloading the OpenHDS "database", that is a
@@ -83,6 +76,7 @@ public class SyncEntitiesTask extends
 	private Entity entity;
 	private boolean isDownloadingZipFile;
 	
+	private HttpURLConnection connection;
 
 	private enum State {
 		DOWNLOADING, SAVING
@@ -164,13 +158,6 @@ public class SyncEntitiesTask extends
 
 	@Override
 	protected HttpTask.EndResult doInBackground(Void... params) {
-		creds = new UsernamePasswordCredentials(username, password);
-
-		HttpParams httpParameters = new BasicHttpParams();
-		HttpConnectionParams.setConnectionTimeout(httpParameters, 60000);
-		HttpConnectionParams.setSoTimeout(httpParameters, 90000);
-		HttpConnectionParams.setSocketBufferSize(httpParameters, 8192);
-		client = new DefaultHttpClient(httpParameters);
 
 		// at this point, we don't care to be smart about which data to
 		// download, we simply download it all
@@ -218,8 +205,7 @@ public class SyncEntitiesTask extends
 	private void deleteAllTables() {
 		// ordering is somewhat important during delete. a few tables have
 		// foreign keys
-		resolver.delete(OpenHDS.IndividualGroups.CONTENT_ID_URI_BASE, null,
-				null);
+		resolver.delete(OpenHDS.IndividualGroups.CONTENT_ID_URI_BASE, null, null);
 		resolver.delete(OpenHDS.Rounds.CONTENT_ID_URI_BASE, null, null);
 		resolver.delete(OpenHDS.Visits.CONTENT_ID_URI_BASE, null, null);
 		resolver.delete(OpenHDS.Relationships.CONTENT_ID_URI_BASE, null, null);
@@ -232,7 +218,7 @@ public class SyncEntitiesTask extends
 	}
 
 
-	 private String getAppStoragePath(){
+	private String getAppStoragePath(){
 	 	File root = Environment.getExternalStorageDirectory();
 	 	String destinationPath = root.getAbsolutePath() + File.separator
 	 			+ "Android" + File.separator + "data" + File.separator
@@ -246,9 +232,9 @@ public class SyncEntitiesTask extends
 	 	}
 	 	
 	 	return destinationPath;
-	 }
+	}
 	 
-	 private InputStream saveFileToStorage(InputStream inputStream) throws Exception {
+	private InputStream saveFileToStorage(InputStream inputStream) throws Exception {
 	  	String path = getAppStoragePath() + "temp.zip";
 	 	FileOutputStream fout = new FileOutputStream(path);
 	 	byte[] buffer = new byte[10*1024];
@@ -265,9 +251,9 @@ public class SyncEntitiesTask extends
 	 	inputStream.close();
 	  	FileInputStream fin = new FileInputStream(path);
 	  	return fin;
-	 }
+	}
 	 
-	 private void processZIPDocument(InputStream inputStream) throws Exception {
+	private void processZIPDocument(InputStream inputStream) throws Exception {
 	  	Log.d("zip", "processing zip file");
 	   	ZipInputStream zin = new ZipInputStream(inputStream);
 	 	ZipEntry entry = zin.getNextEntry();
@@ -278,13 +264,26 @@ public class SyncEntitiesTask extends
 	  	zin.close();
 	 }
 	
-	private void processUrl(String url) throws Exception {
+	private void processUrl(String strUrl) throws Exception {
 		state = State.DOWNLOADING;
 		publishProgress();
 
-		this.isDownloadingZipFile = url.endsWith("zipped");
+		this.isDownloadingZipFile = strUrl.endsWith("zipped");
 		
-		httpGet = new HttpGet(url);
+		String basicAuth = "Basic " + new String(Base64.encode((this.username+":"+this.password).getBytes(),Base64.NO_WRAP ));
+
+		URL url = new URL(strUrl);
+		connection = (HttpURLConnection) url.openConnection();
+		connection.setRequestMethod("GET");
+		connection.setReadTimeout(10000);
+		connection.setConnectTimeout(15000);
+		connection.setDoInput(true);
+		connection.setRequestProperty("Authorization", basicAuth);
+
+		Log.d("processing", ""+url);
+
+		connection.connect(); 
+		
 		processResponse();
 	}
 
@@ -305,25 +304,17 @@ public class SyncEntitiesTask extends
 		}
 	}
 
-	private InputStream getResponse() throws AuthenticationException,
-			ClientProtocolException, IOException, HttpException, Exception {
-		HttpResponse response = null;
-
-		httpGet.addHeader(new BasicScheme().authenticate(creds, httpGet));
-		httpGet.addHeader("content-type", "application/xml");
-		response = client.execute(httpGet);
-		
+	private InputStream getResponse() throws Exception {
+				
 		//Handle 404
-		if(response.getStatusLine().getStatusCode() == HttpStatus.SC_NOT_FOUND){
+		if(connection.getResponseCode() == HttpStatus.SC_NOT_FOUND){
 			throw new RuntimeException("404 Not found.");
 		}		
-
-		HttpEntity entity = response.getEntity();
 		
 		PushbackInputStream in = null;
 		boolean empty = false;
 		if(entity != null) {
-			in = new PushbackInputStream(entity.getContent());
+			in = new PushbackInputStream(connection.getInputStream());
 		    try {
 		        int firstByte=in.read();
 		        if(firstByte != -1) {

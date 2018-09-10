@@ -3,6 +3,7 @@ package org.openhds.mobile.task;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -11,14 +12,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import net.sqlcipher.SQLException;
-
-import org.apache.http.HttpResponse;
 import org.openhds.mobile.OpenHDS;
+import org.openhds.mobile.R;
 import org.openhds.mobile.listener.SyncDatabaseListener;
 import org.openhds.mobile.model.FieldWorker;
 import org.openhds.mobile.model.Settings;
-import org.openhds.mobile.R;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -27,6 +25,7 @@ import android.app.ProgressDialog;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import net.sqlcipher.SQLException;
 
 public class SyncFieldworkersTask extends HttpTask<Void, Integer> {
 
@@ -47,9 +46,9 @@ public class SyncFieldworkersTask extends HttpTask<Void, Integer> {
 	}
 
 	@Override
-	protected EndResult handleResponseData(HttpResponse response) {
+	protected EndResult handleResponseData(HttpURLConnection response) {
 			try {
-				processXMLDocument(response.getEntity().getContent());
+				processXMLDocument(response.getInputStream());
 			} catch (IllegalStateException e) {
 				return EndResult.FAILURE;
 			} catch (XmlPullParserException e) {

@@ -1010,9 +1010,9 @@ public class OpenHDSProvider extends ContentProvider {
     
     public void insert(SQLiteDatabase db, Uri uri, ContentValues values){
     	String table;
-        Uri contentUriBase;
 
-        switch (sUriMatcher.match(uri)) {
+        Uri contentUriBase;
+		switch (sUriMatcher.match(uri)) {
         case INDIVIDUALS:
             table = OpenHDS.Individuals.TABLE_NAME;
             contentUriBase = OpenHDS.Individuals.CONTENT_ID_URI_BASE;

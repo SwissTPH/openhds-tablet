@@ -3,28 +3,21 @@ package org.openhds.mobile.task;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.auth.BasicScheme;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
 import org.openhds.mobile.OpenHDS;
+import org.openhds.mobile.R;
 import org.openhds.mobile.listener.SyncDatabaseListener;
 import org.openhds.mobile.model.Settings;
-import org.openhds.mobile.R;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -34,6 +27,8 @@ import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.util.Base64;
+import android.util.Log;
 
 /**
  * AsyncTask responsible for downloading the OpenHDS "database", that is a
@@ -69,6 +64,8 @@ public class SyncFormsTask extends AsyncTask<Void, Integer, HttpTask.EndResult> 
     private Entity entity;
     private Context mContext;
 
+    private HttpURLConnection connection;
+    
     private enum State {
         DOWNLOADING, SAVING
     }
@@ -77,8 +74,7 @@ public class SyncFormsTask extends AsyncTask<Void, Integer, HttpTask.EndResult> 
         FORMS
     }
 
-    public SyncFormsTask(String url, String username, String password, ProgressDialog dialog, Context context,
-    		SyncDatabaseListener listener) {
+    public SyncFormsTask(String url, String username, String password, ProgressDialog dialog, Context context, SyncDatabaseListener listener) {
         this.baseurl = url;
         this.username = username;
         this.password = password;
@@ -115,15 +111,8 @@ public class SyncFormsTask extends AsyncTask<Void, Integer, HttpTask.EndResult> 
 
     @Override
     protected HttpTask.EndResult doInBackground(Void... params) {
-        creds = new UsernamePasswordCredentials(username, password);
 
-        HttpParams httpParameters = new BasicHttpParams();
-        HttpConnectionParams.setConnectionTimeout(httpParameters, 60000);
-        HttpConnectionParams.setSoTimeout(httpParameters, 90000);
-        HttpConnectionParams.setSocketBufferSize(httpParameters, 8192);
-        client = new DefaultHttpClient(httpParameters);
-
-        // at this point, we don't care to be smart about which data to
+    	// at this point, we don't care to be smart about which data to
         // download, we simply download it all
         deleteAllTables();
 
@@ -146,11 +135,24 @@ public class SyncFormsTask extends AsyncTask<Void, Integer, HttpTask.EndResult> 
      
     }
 
-    private void processUrl(String url) throws Exception {
+    private void processUrl(String strUrl) throws Exception {
         state = State.DOWNLOADING;
         publishProgress();
 
-        httpGet = new HttpGet(url);
+        String basicAuth = "Basic " + new String(Base64.encode((this.username+":"+this.password).getBytes(),Base64.NO_WRAP ));
+
+		URL url = new URL(strUrl);
+		connection = (HttpURLConnection) url.openConnection();
+		connection.setRequestMethod("GET");
+		connection.setReadTimeout(10000);
+		connection.setConnectTimeout(15000);
+		connection.setDoInput(true);
+		connection.setRequestProperty("Authorization", basicAuth);
+
+		Log.d("processing", ""+url);
+
+		connection.connect();        
+        
         processResponse();
     }
 
@@ -160,15 +162,10 @@ public class SyncFormsTask extends AsyncTask<Void, Integer, HttpTask.EndResult> 
             processXMLDocument(inputStream);
     }
 
-    private InputStream getResponse() throws AuthenticationException, ClientProtocolException, IOException {
-        HttpResponse response = null;
-
-        httpGet.addHeader(new BasicScheme().authenticate(creds, httpGet));
-        httpGet.addHeader("content-type", "application/xml");
-        response = client.execute(httpGet);
-
-        HttpEntity entity = response.getEntity();
-        return entity.getContent();
+    private InputStream getResponse() throws Exception {
+    	int response = connection.getResponseCode();
+		//Log.d("connection", "The response code is: " + response+", type="+connection.getContentType()+", size="+connection.getContentLength());
+		return connection.getInputStream();
     }
 
     private void processXMLDocument(InputStream content) throws Exception {
