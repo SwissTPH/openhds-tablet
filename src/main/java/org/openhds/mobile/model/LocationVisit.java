@@ -306,7 +306,8 @@ public class LocationVisit implements Serializable {
         if (cursor.moveToFirst()) {
             generatedId = generateLocationIdFrom(cursor.getString(0), resolver);
         } else {
-            generatedId = getLatestLevelExtId() + fieldWorker.getExtId().substring(2,5) + "001";
+        //	generatedId = getLatestLevelExtId() + fieldWorker.getExtId().substring(2,5) + "001";
+        	generatedId = getLatestLevelExtId() +   "000001";
         }
 
         cursor.close();
@@ -315,11 +316,14 @@ public class LocationVisit implements Serializable {
 
     private String generateLocationIdFrom(String lastGeneratedId, ContentResolver resolver) {
         try {
-            int increment = Integer.parseInt(lastGeneratedId.substring(6, 9));
+        	//int increment = Integer.parseInt(lastGeneratedId.substring(6, 9));
+            int increment = Integer.parseInt(lastGeneratedId.substring(3, 9));
             int nextIncrement = increment + 1;
-            return String.format(getLatestLevelExtId() +  fieldWorker.getExtId().substring(2,5) + "%03d", nextIncrement);
+           // return String.format(getLatestLevelExtId() +  fieldWorker.getExtId().substring(2,5) + "%03d", nextIncrement);
+           return String.format(getLatestLevelExtId() + "%06d", nextIncrement);
         } catch (NumberFormatException e) {
-            return getLatestLevelExtId() +  fieldWorker.getExtId().substring(2,5) + "001";
+        	 //return getLatestLevelExtId() +  fieldWorker.getExtId().substring(2,5) + "001";
+           return getLatestLevelExtId() + "000001";
         }
     }
 
@@ -329,7 +333,7 @@ public class LocationVisit implements Serializable {
     		suffix="0"+suffix;
     	}
     	String generatedId;
-    	if (visitLevel.equalsIgnoreCase("location")) {
+    	if ("location".equalsIgnoreCase(visitLevel)) {
     		generatedId = location.getExtId() + suffix ;
     	} else {
     		if (socialgroup!=null) {
@@ -409,7 +413,11 @@ public class LocationVisit implements Serializable {
               return sg;
             }
         } else {
-            sg.setExtId(socialGroupPrefix + "00");
+        	  if (visitLevel.equalsIgnoreCase("location")) {
+        		  sg.setExtId(socialGroupPrefix + "00");
+        	  } else {
+        		  sg.setExtId(socialGroupPrefix + "01");
+        	  }
         }
 
         cursor.close();
