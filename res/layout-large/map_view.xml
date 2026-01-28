@@ -18,14 +18,7 @@
       	android:layout_weight="1" />
 
     
-	<!--<com.google.android.maps.MapView 
-	    android:id="@+id/mapview"
-	    android:layout_width="wrap_content"
-	    android:layout_height="fill_parent"
-	    android:layout_weight="1"
-	    android:apiKey="AIzaSyBbPg0R37TKG6r57JjE0JKK8X-vAbOLwP8"
-	    android:clickable="true" />-->
-	    	 
+	
 	      <fragment
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:id="@+id/mapview"
